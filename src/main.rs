@@ -39,8 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>{
         println!("~/.config/quikcrypt exists, moving on...");
     } else{
         println!("Creating ~/.config/quikcrypt directory for encrypted storage...");
-        let file_path = Path::new(&path);
-        fs::create_dir(file_path)?;
+        fs::create_dir_all(&path)?;
     }
     if args.create_file{
         let mut key = [0u8; 32];
@@ -62,8 +61,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>>{
         let nonce = Nonce::from_slice(&nonce_bytes);
         let cipher = ChaCha20Poly1305::new(&key.into());
         let ciphertext = cipher.encrypt(nonce, plaintext.as_ref()).expect("Failed to encrypt file.");
-        let mut file =  
+        let mut file_path = path.clone();
+        file_path.push(&args.filepath);
+        let mut file =  File::create(&file_path)?;
+        file.write_all(&salt)?;
+        file.write_all(&nonce_bytes)?;
+        file.write_all(&ciphertext)?;
+
         println!("Creating file at ~/.config/quikcrypt/{}", args.filepath);
+
+        plaintext.zeroize();
+        key.zeroize();
+        let mut password_bytes = password.to_vec();
+        password_bytes.zeroize();
     }
     if args.decrypt{
         println!("Decrypting file at {}", args.filepath);
