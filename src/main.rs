@@ -5,7 +5,7 @@ use argon2::{
 };
 use std::fs::File;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use zeroize::Zeroize;
 use chacha20poly1305::{
     aead::Aead,
@@ -13,6 +13,7 @@ use chacha20poly1305::{
     Nonce,
     KeyInit,
 };
+use dirs::config_dir;
 
 use rand_core::{OsRng, TryRngCore};
 #[derive(Parser, Debug)]
@@ -31,12 +32,14 @@ struct Args {
 }
 fn main() -> Result<(), Box<dyn std::error::Error>>{
     let args = Args::parse();
-    let path = "~/.config/quikcrypt";
-    if Path::new(path).exists(){
+    let mut path: PathBuf = dirs::home_dir().expect("Failed to get home directory.");
+    path.push(".config");
+    path.push("quikcrypt");
+    if path.exists(){
         println!("~/.config/quikcrypt exists, moving on...");
     } else{
         println!("Creating ~/.config/quikcrypt directory for encrypted storage...");
-        let file_path = Path::new(path);
+        let file_path = Path::new(&path);
         fs::create_dir(file_path)?;
     }
     if args.create_file{
@@ -45,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>{
         let mut nonce_bytes = [0u8; 12];
 
         let mut plaintext = Vec::new();
-        std::io::stdin().read_to_end(&mut plaintext);
+        std::io::stdin().read_to_end(&mut plaintext)?;
 
         println!("Enter a secure encryption password: ");
         let mut password = String::new();
