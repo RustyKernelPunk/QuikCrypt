@@ -98,7 +98,7 @@ fn main() -> Result<()>{
         if !path.exists(){
             bail!("Can't decrypt a file from a non-existent ~/.config directory.");
         }
-
+        
         //Key bytes, password entering
         let mut key = [0u8; 32];
         println!("Enter the file's password: ");
@@ -113,6 +113,11 @@ fn main() -> Result<()>{
         let mut buf = Vec::new();
         encrypted_file.read_to_end(&mut buf)?;
         
+        //Failsafe to check if file tampered with
+        if buf.len() < 44{
+            bail!("File tampered with, cannot decrypt!");
+        }
+
         //Reads salt, nonce, ciphertext
         let salt = buf[0..SALT_LENGTH].to_vec();
         let nonce_slice = buf[SALT_LENGTH..SALT_LENGTH + NONCE].to_vec();
