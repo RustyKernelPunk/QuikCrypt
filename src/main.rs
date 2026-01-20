@@ -1,11 +1,11 @@
 use clap::Parser;
-use std::io::{self, Read, Write, stdin, stdout};
+use std::io::{Read, Write};
 use argon2::{
     Argon2
 };
 use std::fs::File;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 use zeroize::Zeroize;
 use chacha20poly1305::{
     aead::Aead,
@@ -13,7 +13,8 @@ use chacha20poly1305::{
     Nonce,
     KeyInit,
 };
-use dirs::config_dir;
+use rpassword::read_password;
+use color_eyre::eyre::{Result, bail};
 
 use rand_core::{OsRng, TryRngCore};
 #[derive(Parser, Debug)]
@@ -28,9 +29,12 @@ struct Args {
     /// Specifies filepath to create/decrypt
     #[arg(short, long, default_value = "note.enc")]
     filepath: String,
+  }
+const SALT_LENGTH: usize = 16;
+const NONCE: usize = 12;
+fn main() -> Result<()>{
+    color_eyre::install()?;
 
-}
-fn main() -> Result<(), Box<dyn std::error::Error>>{
     let args = Args::parse();
     let mut path: PathBuf = dirs::home_dir().expect("Failed to get home directory.");
     path.push(".config");
@@ -50,13 +54,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>>{
         std::io::stdin().read_to_end(&mut plaintext)?;
 
         println!("Enter a secure encryption password: ");
-        let mut password = String::new();
-        stdin().read_line(&mut password)?;
+        let password = read_password()?;
         let password = password.as_bytes();
 
+        if password.len() < 8 {
+            bail!("Password too short and insecure! Must be longer!");
+        }
         OsRng.try_fill_bytes(&mut salt).unwrap();
-        Argon2::default().hash_password_into(password, &salt[..], &mut key).expect("failed to hash password.");
-
+        Argon2::default().hash_password_into(password, &salt[..], &mut key).expect("Couldn't hash password!");        
         OsRng.try_fill_bytes(&mut nonce_bytes).unwrap();
         let nonce = Nonce::from_slice(&nonce_bytes);
         let cipher = ChaCha20Poly1305::new(&key.into());
@@ -76,7 +81,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>>{
         password_bytes.zeroize();
     }
     if args.decrypt{
-        println!("Decrypting file at {}", args.filepath);
+        println!("Enter the file's password: ");
+        let password = read_password()?;
+        let password = password.as_bytes();
+
+        path.push(args.filepath);
+
+        let mut encrypted_file = File::open(path)?;
+        let mut buf = Vec::new();
+        encrypted_file.read_to_end(&mut buf)?;
+        
+        let salt = buf[0..SALT_LENGTH].to_vec();
+        let nonce = buf[SALT_LENGTH..SALT_LENGTH + NONCE].to_vec();
+        let ciphertext = buf[SALT_LENGTH + NONCE..].to_vec();
+
+        println!("Decrypting file...");
     }
     Ok(())
 }
+
