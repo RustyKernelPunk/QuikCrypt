@@ -1,5 +1,5 @@
 use clap::Parser;
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
 use argon2::{
     Argon2
 };
@@ -14,7 +14,7 @@ use chacha20poly1305::{
     KeyInit,
 };
 use rpassword::read_password;
-use color_eyre::eyre::{Result, bail};
+use color_eyre::eyre::{Result, bail, eyre};
 
 use rand_core::{OsRng, TryRngCore};
 #[derive(Parser, Debug)]
@@ -81,6 +81,7 @@ fn main() -> Result<()>{
         password_bytes.zeroize();
     }
     if args.decrypt{
+        let mut key = [0u8; 32];
         println!("Enter the file's password: ");
         let password = read_password()?;
         let password = password.as_bytes();
@@ -92,11 +93,24 @@ fn main() -> Result<()>{
         encrypted_file.read_to_end(&mut buf)?;
         
         let salt = buf[0..SALT_LENGTH].to_vec();
-        let nonce = buf[SALT_LENGTH..SALT_LENGTH + NONCE].to_vec();
+        let nonce_slice = buf[SALT_LENGTH..SALT_LENGTH + NONCE].to_vec();
         let ciphertext = buf[SALT_LENGTH + NONCE..].to_vec();
-
+        
         println!("Decrypting file...");
+        Argon2::default().hash_password_into(password, &salt, &mut key).expect("Failed to hash password!");
+        let cipher = ChaCha20Poly1305::new(&key.into());
+        let nonce = Nonce::from_slice(&nonce_slice);
+        let plaintext = cipher.decrypt(nonce, ciphertext.as_ref()).map_err(|_| eyre!("Decryption failed!"))?;
+        
+        let mut out = io::stdout();
+        out.write_all(&plaintext)?;
+        out.flush()?;
+    
+        key.zeroize();
+        let mut password_bytes = password.to_vec();
+        password_bytes.zeroize();
     }
     Ok(())
 }
+
 
