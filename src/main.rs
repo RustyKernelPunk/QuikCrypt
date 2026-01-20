@@ -119,7 +119,6 @@ fn main() -> Result<()>{
         let ciphertext = buf[SALT_LENGTH + NONCE..].to_vec();
         
         //Decrypts
-        println!("Decrypting file...");
         Argon2::default().hash_password_into(password, &salt, &mut key).expect("Failed to hash password!");
         let cipher = ChaCha20Poly1305::new(&key.into());
         let nonce = Nonce::from_slice(&nonce_slice);
