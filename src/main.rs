@@ -127,7 +127,7 @@ fn main() -> Result<()>{
         Argon2::default().hash_password_into(password, &salt, &mut key).expect("Failed to hash password!");
         let cipher = ChaCha20Poly1305::new(&key.into());
         let nonce = Nonce::from_slice(&nonce_slice);
-        let plaintext = cipher.decrypt(nonce, ciphertext.as_ref()).map_err(|_| eyre!("Decryption failed!"))?;
+        let plaintext = cipher.decrypt(nonce, ciphertext.as_ref()).map_err(|_| eyre!("Decryption failed, file may have been tampered with!"))?;
         
         //Pipes to stdout
         let mut out = io::stdout();
